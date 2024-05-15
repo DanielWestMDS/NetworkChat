@@ -6,6 +6,9 @@
 
 #define BUFFER_SIZE 256
 
+char g_cPutStr[255];
+char g_cCapitalStr[255];
+
 bool InitWSA()
 {
 	WORD wVersionRequested;
@@ -29,10 +32,8 @@ bool InitWSA()
 	return true;
 }
 
-
 int main()
 {
-	char g_PutStr[255];
 	// initialise WSA
 	InitWSA();
 
@@ -106,6 +107,15 @@ int main()
 			printf("Error in recieve(). Error Code %d\n", WSAGetLastError());
 			continue;
 		}
+
+		// if rcv 0 then client has disconnected
+		if (rcv == 0)
+		{
+			printf("Client disconnected\n");
+			closesocket(cliSock);
+			break;
+		}
+
 		// prevent 256 edge case from messing things up
 		if (rcv < BUFFER_SIZE)
 		{
@@ -121,11 +131,39 @@ int main()
 			{
 				for (int i = 4; i < 255; i++)
 				{
-					g_PutStr[i - 4] = buffer[i];
+					g_cPutStr[i - 4] = buffer[i];
 				}
+				printf("Message recieved\n");
+			}
+
+			// check for /GET command
+			if (strstr(buffer, "/GET"))
+			{
+				printf("Put message: %s\n\n", g_cPutStr);
+			}
+
+			// check for /CAPITALIZE command
+			if (strstr(buffer, "/CAPITALIZE"))
+			{
+				for (int i = 12; i < 255; i++)
+				{
+					// alter ascii within lowercase alphabet to be capital
+					if (buffer[i] < 123 && buffer[i] > 96)
+					{
+						g_cCapitalStr[i - 12] = buffer[i] - 32;
+					}
+					// just write non lowercase letters like normal
+					else
+					{
+						g_cCapitalStr[i - 12] = buffer[i];
+					}
+				}
+				printf("Capitalized message: %s\n\n", g_cCapitalStr);
 			}
 		}
 
-		printf("Put message: %s\n\n", g_PutStr);
 	}
+
+	// close server if all all hosts disconnected
+	closesocket(sock);
 }

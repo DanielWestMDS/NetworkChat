@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <WS2tcpip.h>
+#include <cstring>
 
 #define BUFFER_SIZE 256
 
@@ -72,6 +73,15 @@ int Client()
 		// can I just use normal cin >> here?
 		std::cin.getline(buffer, BUFFER_SIZE);
 
+		// close socket if QUIT command called
+		if (strstr(buffer, "/QUIT"))
+		{
+			shutdown(clientSock, SD_SEND);
+			closesocket(clientSock);
+			break;
+		}
+
+		// error checking
 		status = send(clientSock, buffer, strlen(buffer), 0);
 		if (status == SOCKET_ERROR)
 		{
