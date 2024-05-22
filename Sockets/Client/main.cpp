@@ -56,7 +56,7 @@ int Client()
 	sockaddr_in recAddr;
 	recAddr.sin_family = AF_INET;
 	recAddr.sin_port = htons(12031);
-	InetPton(AF_INET, L"127.0.0.1", &recAddr.sin_addr.S_un.S_addr);
+	InetPton(AF_INET, L"192.168.1.17", &recAddr.sin_addr.S_un.S_addr);
 
 	status = connect(clientSock, (sockaddr*)&recAddr, sizeof(recAddr));
 	if (status == SOCKET_ERROR)
