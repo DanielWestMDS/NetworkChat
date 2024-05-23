@@ -1,10 +1,5 @@
-#include <winsock2.h>
-#include <stdio.h>
-#include <iostream>
-#include <WS2tcpip.h>
-#include <cstring>
+#include "CClient.h"
 
-#define BUFFER_SIZE 256
 
 bool InitWSA()
 {
@@ -29,75 +24,17 @@ bool InitWSA()
 	return true;
 }
 
-int Client()
-{
-	SOCKET clientSock;
-	clientSock = socket(AF_INET, SOCK_STREAM, 0);
-	if (clientSock == INVALID_SOCKET)
-	{
-		printf("Error in socket(), error: %d\n", WSAGetLastError());
-		return 0;
-	}
-
-	//set address
-	sockaddr_in clientAddr;
-	clientAddr.sin_family = AF_INET;
-	clientAddr.sin_port = htons(54672);
-	clientAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-
-	//bind 
-	int status = bind(clientSock, (sockaddr*)&clientAddr, sizeof(clientAddr));
-	if (status == SOCKET_ERROR)
-	{
-		printf("Error in bind(), Error: %d\n", WSAGetLastError());
-		return 0;
-	}
-
-	sockaddr_in recAddr;
-	recAddr.sin_family = AF_INET;
-	recAddr.sin_port = htons(12031);
-	InetPton(AF_INET, L"192.168.1.17", &recAddr.sin_addr.S_un.S_addr);
-
-	status = connect(clientSock, (sockaddr*)&recAddr, sizeof(recAddr));
-	if (status == SOCKET_ERROR)
-	{
-		printf("Error in connect() Error: %d\n", WSAGetLastError());
-		return 0;
-	}
-
-	char buffer[BUFFER_SIZE];
-
-	while (true)
-	{
-		printf("Enter a message to send: \n");
-		// can I just use normal cin >> here?
-		std::cin.getline(buffer, BUFFER_SIZE);
-
-		// close socket if QUIT command called
-		if (strstr(buffer, "/QUIT"))
-		{
-			shutdown(clientSock, SD_SEND);
-			closesocket(clientSock);
-			break;
-		}
-
-		// error checking
-		status = send(clientSock, buffer, strlen(buffer), 0);
-		if (status == SOCKET_ERROR)
-		{
-			printf("Error in send(). Error: %d\n", WSAGetLastError());
-			break;
-		}
-	}
-
-	closesocket(clientSock);
-}
-
 int main()
 {
+	//CClient* Client = new CClient();
 	// initialise WSA
 	InitWSA();
 
-	Client();
+	CClient Client;
+
+	if (Client.Setup())
+	{
+		Client.SendLoop();
+	}
 	return 0;
 }

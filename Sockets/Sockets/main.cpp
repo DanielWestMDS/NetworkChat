@@ -3,6 +3,8 @@
 #include <iostream>
 #include <WS2tcpip.h>
 #include <cstring>
+#include <algorithm>
+#include <vector>
 
 #define BUFFER_SIZE 256
 
@@ -96,7 +98,8 @@ int main()
 	// recieve
 	char clientName[13];
 	printf("got connection from client %s \n", inet_ntop(AF_INET, &cliAddr.sin_addr,
-		clientName, sizeof(clientName)));	printf("receiving. . . \n");
+		clientName, sizeof(clientName)));	
+	printf("receiving. . . \n");
 	char buffer[BUFFER_SIZE];
 	while (true)
 	{
@@ -137,13 +140,13 @@ int main()
 			}
 
 			// check for /GET command
-			if (strstr(buffer, "/GET"))
+			else if (strstr(buffer, "/GET"))
 			{
 				printf("Put message: %s\n\n", g_cPutStr);
 			}
 
 			// check for /CAPITALIZE command
-			if (strstr(buffer, "/CAPITALIZE"))
+			else if (strstr(buffer, "/CAPITALIZE"))
 			{
 				for (int i = 12; i < 255; i++)
 				{
@@ -160,8 +163,39 @@ int main()
 				}
 				printf("Capitalized message: %s\n\n", g_cCapitalStr);
 			}
-		}
 
+			// check for /POWER command
+			else if (strstr(buffer, "/POWER"))
+			{
+				char cPowerStr[255];
+				int iPowerNum = 0;
+				for (auto number : buffer)
+				{
+					cPowerStr[iPowerNum] = [](int number)->int {return number + number;}(number);
+					iPowerNum++;
+				}
+
+				printf("Power of %s: %s\n\n", buffer, cPowerStr);
+				//for (int i = 12; i < 255; i++)
+				//{
+				//	// alter ascii within lowercase alphabet to be capital
+				//	if (buffer[i] < 123 && buffer[i] > 96)
+				//	{
+				//		g_cCapitalStr[i - 12] = buffer[i] - 32;
+				//	}
+				//	// just write non lowercase letters like normal
+				//	else
+				//	{
+				//		g_cCapitalStr[i - 12] = buffer[i];
+				//	}
+				//}
+				//printf("Capitalized message: %s\n\n", g_cCapitalStr);
+			}
+			else
+			{
+				printf("INVALID COMMAND \n\n");
+			}
+		}
 	}
 
 	// close server if all all hosts disconnected
