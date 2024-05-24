@@ -22,6 +22,7 @@ private:
 	sockaddr_in m_clientAddr;
 	// bind status
 	int m_iStatus;
+	// wherer message is held
 	char buffer[BUFFER_SIZE];
 };
 

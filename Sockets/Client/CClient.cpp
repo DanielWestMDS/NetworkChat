@@ -2,10 +2,18 @@
 
 CClient::CClient()
 {
+	// initialise values
+	m_clientSock = NULL;
+	m_clientAddr.sin_family = NULL;
+	m_clientAddr.sin_port = NULL;
+	m_clientAddr.sin_addr.S_un.S_addr = NULL;	// bind status
+	m_iStatus = 0;
+	buffer[255] = {};
 }
 
 CClient::~CClient()
 {
+	shutdown(m_clientSock, SD_SEND);
 	closesocket(m_clientSock);
 }
 

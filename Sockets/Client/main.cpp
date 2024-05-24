@@ -1,5 +1,5 @@
 #include "CClient.h"
-
+#include <memory>
 
 bool InitWSA()
 {
@@ -30,11 +30,12 @@ int main()
 	// initialise WSA
 	InitWSA();
 
-	CClient Client;
+	// unique pointer so it is automatically deleted when it goes out of scope.
+	std::unique_ptr<CClient> Client = std::make_unique<CClient>();
 
-	if (Client.Setup())
+	if (Client->Setup())
 	{
-		Client.SendLoop();
+		Client->SendLoop();
 	}
 	return 0;
 }
