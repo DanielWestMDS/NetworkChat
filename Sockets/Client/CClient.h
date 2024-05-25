@@ -28,5 +28,8 @@ private:
 	wchar_t m_wIP[BUFFER_SIZE];
 	char m_cIP[BUFFER_SIZE];
 
+	// constexpr for ports
+	static constexpr int DEFAULT_PORT = 12031;
+	static constexpr int BASE_PORT = 54672;
 };
 

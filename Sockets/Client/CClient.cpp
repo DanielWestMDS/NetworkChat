@@ -34,7 +34,7 @@ int CClient::Setup()
 	{
 		//set address
 		m_clientAddr.sin_family = AF_INET;
-		m_clientAddr.sin_port = htons(54672 + iSockOffset);
+		m_clientAddr.sin_port = htons(BASE_PORT + iSockOffset);
 		m_clientAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
 
 		//bind 
@@ -48,7 +48,7 @@ int CClient::Setup()
 
 	sockaddr_in recAddr;
 	recAddr.sin_family = AF_INET;
-	recAddr.sin_port = htons(12031);
+	recAddr.sin_port = htons(DEFAULT_PORT);
 	printf("\nPlease Enter the Server IP address: ");
 	std::cin.getline(m_cIP, BUFFER_SIZE);
 	// convert IP to something InetPton can read (wchar_t)

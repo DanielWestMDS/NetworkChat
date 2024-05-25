@@ -171,10 +171,7 @@ int main()
 	// initialise WSA
 	InitWSA();
 
-	//char input;
-	//std::cout << "input 1 for server 2 for client: ";
-	//std::cin >> input;
-
+	// create server socket
 	SOCKET sock;
 	sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock == INVALID_SOCKET)
@@ -184,6 +181,7 @@ int main()
 		return 0;
 	}
 
+	// set server socket address
 	sockaddr_in sockAddr{};
 	sockAddr.sin_family = AF_INET;
 	sockAddr.sin_port = htons(12031);
@@ -198,13 +196,7 @@ int main()
 		return 0;
 	}
 
-	//// listen()
-	//if (!listen(sock))
-	//{
-	//	printf("Error in listen(). Code: %d\n", WSAGetLastError());
-	//	WSACleanup();
-	//	return 0;
-	//}
+	// listen()
 	printf("Listening. . . \n");
 	int status = listen(sock, 5);
 	if (status == SOCKET_ERROR)
@@ -217,21 +209,43 @@ int main()
 	printf("accepting. . .\n");
 	while (g_bServerRunning)
 	{
-		sockaddr_in cliAddr;
-		int addrLen = sizeof(cliAddr);
-		SOCKET cliSock = accept(sock, (sockaddr*)&cliAddr, &addrLen);
-		if (cliSock == INVALID_SOCKET)
+		// for montoring socket
+		fd_set readfds;
+		FD_ZERO(&readfds);
+		FD_SET(sock, &readfds);
+
+		// timeout duration for select()
+		timeval timeout;
+		// timeout set to one second
+		timeout.tv_sec = 1;
+		timeout.tv_usec = 0;
+
+		// select()
+		int activity = select(0, &readfds, NULL, NULL, &timeout);
+		if (activity == SOCKET_ERROR)
 		{
-			// report error if server is supposed to be running
-			if (g_bServerRunning)  
-			{
-				printf("Accept error: %d\n", WSAGetLastError());
-			}
-			continue;
+			printf("Select error: %d\n", WSAGetLastError());
+			break;
 		}
 
-		std::thread clientThread(ManageClient, cliSock);
-		clientThread.detach();
+		if (activity > 0 && FD_ISSET(sock, &readfds))
+		{
+			sockaddr_in cliAddr;
+			int addrLen = sizeof(cliAddr);
+			SOCKET cliSock = accept(sock, (sockaddr*)&cliAddr, &addrLen);
+			if (cliSock == INVALID_SOCKET)
+			{
+				// report error is server is supposed to be running
+				if (g_bServerRunning) 
+				{
+					printf("Accept error: %d\n", WSAGetLastError());
+				}
+				continue;
+			}
+
+			std::thread clientThread(ManageClient, cliSock);
+			clientThread.detach();
+		}
 	}
 	
 	// wait for all clients to disconnect
