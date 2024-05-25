@@ -1,3 +1,16 @@
+// Bachelor of Software Engineering
+// Media Design School
+// Auckland
+// New Zealand
+//
+// (c) Media Design School
+//
+// File Name : main.cpp
+// Description : main file for server. Hosts a server socket and gets multiple client sockets through threads. 
+//				 Uses condition variable and atomic bool to close if all clients disconnect
+// Author : Daniel West
+// Mail : daniel.west@mds.ac.nz
+
 #include <winsock2.h>
 #include <stdio.h>
 #include <iostream>
@@ -25,6 +38,9 @@ std::condition_variable g_ConditionVar;
 // atomic bool for closing server after all clients disconnected
 std::atomic<bool> g_bServerRunning = true;
 
+// vector containg all connected clients
+std::vector<SOCKET> g_ConnectedClients;
+
 bool InitWSA()
 {
 	WORD wVersionRequested;
@@ -51,13 +67,26 @@ bool InitWSA()
 
 void ManageClient(SOCKET cliSock)
 {
+	// add new socket to the list of connected clients
+	g_ConnectedClients.push_back(cliSock); 
+
+	// Notify all clients about the new client
+	for (SOCKET& clientSock : g_ConnectedClients)
+	{
+		// exclude the client just added
+		if (clientSock != cliSock) 
+		{
+			std::string sMessage = "New client joined the server.\n";
+			send(clientSock, sMessage.c_str(), sMessage.size(), 0);
+		}
+	}
+
 	// brackets so lock goes out of scope after increasing clients
 	{
 		std::lock_guard<std::mutex> lock(g_ClientMutex);
 		g_iActiveClients++;
 	}
-	// recieve
-
+	// recieve()
 	char buffer[BUFFER_SIZE];
 	sockaddr_in cliAddr;
 	int addrLen = sizeof(cliAddr);
@@ -103,13 +132,20 @@ void ManageClient(SOCKET cliSock)
 				{
 					g_cPutStr[i - 4] = buffer[i];
 				}
+				// display to server console
 				printf("Message recieved\n");
+				// display to client
+				std::string sMessage = "Your secret is safe with the server.\n";
+				send(cliSock, sMessage.c_str(), sMessage.size(), 0);
 			}
 
 			// check for /GET command
 			else if (strstr(buffer, "/GET"))
 			{
+				// display to server console
 				printf("Put message: %s\n\n", g_cPutStr);
+				// display to client
+				send(cliSock, g_cPutStr, BUFFER_SIZE - 1, 0);
 			}
 
 			// check for /CAPITALIZE command
@@ -128,7 +164,10 @@ void ManageClient(SOCKET cliSock)
 						g_cCapitalStr[i - 12] = buffer[i];
 					}
 				}
+				// display to server console
 				printf("Capitalized message: %s\n\n", g_cCapitalStr);
+				// display to client
+				send(cliSock, g_cCapitalStr, BUFFER_SIZE - 1, 0);
 			}
 
 			// check for /LAMBDA command
@@ -137,8 +176,10 @@ void ManageClient(SOCKET cliSock)
 				printf("The following text was produced with a lambda: \n\n");
 				char cPowerStr[255];
 				int iPowerNum = 0;
+				// wow look auto c++ 11 feature please please please
 				for (auto number : buffer)
 				{
+					// lambda c++ 11 feature please please please
 					cPowerStr[iPowerNum] = [](int number)->int {return number * number;}(number);
 					iPowerNum++;
 				}
@@ -148,6 +189,14 @@ void ManageClient(SOCKET cliSock)
 			else
 			{
 				printf("INVALID COMMAND \n\n");
+			}
+		}
+		else
+		{
+			// send non commands to all clients
+			for (SOCKET& clientSock : g_ConnectedClients)
+			{
+				send(clientSock, buffer, BUFFER_SIZE - 1, 0);
 			}
 		}
 	}

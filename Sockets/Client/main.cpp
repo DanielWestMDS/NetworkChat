@@ -1,3 +1,15 @@
+// Bachelor of Software Engineering
+// Media Design School
+// Auckland
+// New Zealand
+//
+// (c) Media Design School
+//
+// File Name : main.cpp
+// Description : main file for client. Initialises WSA and calls client class with a smart pointer. 
+// Author : Daniel West
+// Mail : daniel.west@mds.ac.nz
+
 #include "CClient.h"
 #include <memory>
 
@@ -26,7 +38,6 @@ bool InitWSA()
 
 int main()
 {
-	//CClient* Client = new CClient();
 	// initialise WSA
 	InitWSA();
 
@@ -35,6 +46,7 @@ int main()
 
 	if (Client->Setup())
 	{
+		// send client data to server
 		Client->SendLoop();
 	}
 
