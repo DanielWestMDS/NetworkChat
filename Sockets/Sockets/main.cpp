@@ -5,11 +5,25 @@
 #include <cstring>
 #include <algorithm>
 #include <vector>
+#include <thread>
+#include <condition_variable>
+#include <mutex>
+#include <atomic>
 
 #define BUFFER_SIZE 256
 
+// strings for commands
 char g_cPutStr[255];
 char g_cCapitalStr[255];
+
+// number of active clients for threads
+int g_iActiveClients = 0;
+// mutex to check if all clients disconnected
+std::mutex g_ClientMutex;
+// condition variable to check if all clients disconnected
+std::condition_variable g_ConditionVar;
+// atomic bool for closing server after all clients disconnected
+std::atomic<bool> g_bServerRunning = true;
 
 bool InitWSA()
 {
@@ -28,79 +42,32 @@ bool InitWSA()
 	if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2)
 	{
 		printf("Error: Version is not available\n");
+		// exit because version does not exist
 		return false;
 	}
 	printf("WSA initialised successfully\n");
 	return true;
 }
 
-int main()
+void ManageClient(SOCKET cliSock)
 {
-	// initialise WSA
-	InitWSA();
-
-	//char input;
-	//std::cout << "input 1 for server 2 for client: ";
-	//std::cin >> input;
-
-	SOCKET sock;
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (sock == INVALID_SOCKET)
+	// brackets so lock goes out of scope after increasing clients
 	{
-		std::cout << "Sock Err: " << WSAGetLastError();
-		WSACleanup();
-		return 0;
+		std::lock_guard<std::mutex> lock(g_ClientMutex);
+		g_iActiveClients++;
 	}
+	// recieve
 
-	sockaddr_in sockAddr{};
-	sockAddr.sin_family = AF_INET;
-	sockAddr.sin_port = htons(12031);
-	sockAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-
-	// bind socket
-	int bound = bind(sock, (sockaddr*)&sockAddr, sizeof(sockAddr));
-	if (bound == SOCKET_ERROR)
-	{
-		std::cout << "Bind Err: " << WSAGetLastError();
-		WSACleanup();
-		return 0;
-	}
-
-	//// listen()
-	//if (!listen(sock))
-	//{
-	//	printf("Error in listen(). Code: %d\n", WSAGetLastError());
-	//	WSACleanup();
-	//	return 0;
-	//}
-	printf("Listening. . . \n");
-	int status = listen(sock, 5);
-	if (status == SOCKET_ERROR)
-	{
-		printf("Error in listen(). Code: %d\n", WSAGetLastError());
-		WSACleanup();
-		return 0;
-	}
-
-	printf("accepting. . .\n");
+	char buffer[BUFFER_SIZE];
 	sockaddr_in cliAddr;
 	int addrLen = sizeof(cliAddr);
-	SOCKET cliSock = accept(sock, (sockaddr*)&cliAddr, &addrLen);
-	if (cliSock == INVALID_SOCKET)
-	{
-		printf("Error in listen(). Code: %d\n", WSAGetLastError());
-		WSACleanup();
-		return 0;
-	}
-
-	//return 1;
-
-	// recieve
+	getpeername(cliSock, (sockaddr*)&cliAddr, &addrLen);
 	char clientName[13];
 	printf("got connection from client %s \n", inet_ntop(AF_INET, &cliAddr.sin_addr,
-		clientName, sizeof(clientName)));	
+		clientName, sizeof(clientName)));
+	inet_ntop(AF_INET, &cliAddr.sin_addr, clientName, sizeof(clientName));
 	printf("receiving. . . \n");
-	char buffer[BUFFER_SIZE];
+
 	while (true)
 	{
 		printf("waiting for a message. . . \n");
@@ -108,7 +75,7 @@ int main()
 		if (rcv == SOCKET_ERROR)
 		{
 			printf("Error in recieve(). Error Code %d\n", WSAGetLastError());
-			continue;
+			break;
 		}
 
 		// if rcv 0 then client has disconnected
@@ -164,32 +131,19 @@ int main()
 				printf("Capitalized message: %s\n\n", g_cCapitalStr);
 			}
 
-			// check for /POWER command
-			else if (strstr(buffer, "/POWER"))
+			// check for /LAMBDA command
+			else if (strstr(buffer, "/LAMBDA"))
 			{
+				printf("The following text was produced with a lambda: \n\n");
 				char cPowerStr[255];
 				int iPowerNum = 0;
 				for (auto number : buffer)
 				{
-					cPowerStr[iPowerNum] = [](int number)->int {return number + number;}(number);
+					cPowerStr[iPowerNum] = [](int number)->int {return number * number;}(number);
 					iPowerNum++;
 				}
 
 				printf("Power of %s: %s\n\n", buffer, cPowerStr);
-				//for (int i = 12; i < 255; i++)
-				//{
-				//	// alter ascii within lowercase alphabet to be capital
-				//	if (buffer[i] < 123 && buffer[i] > 96)
-				//	{
-				//		g_cCapitalStr[i - 12] = buffer[i] - 32;
-				//	}
-				//	// just write non lowercase letters like normal
-				//	else
-				//	{
-				//		g_cCapitalStr[i - 12] = buffer[i];
-				//	}
-				//}
-				//printf("Capitalized message: %s\n\n", g_cCapitalStr);
 			}
 			else
 			{
@@ -198,6 +152,95 @@ int main()
 		}
 	}
 
+	// alter active clients if client disconnects
+	{
+		std::lock_guard<std::mutex> lock(g_ClientMutex);
+		g_iActiveClients--;
+		if (g_iActiveClients == 0)
+		{
+			// set condition variable if all clients disconnect
+			g_ConditionVar.notify_all();
+			// stop server running if no clients
+			g_bServerRunning = false;
+		}
+	}
+}
+
+int main()
+{
+	// initialise WSA
+	InitWSA();
+
+	//char input;
+	//std::cout << "input 1 for server 2 for client: ";
+	//std::cin >> input;
+
+	SOCKET sock;
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock == INVALID_SOCKET)
+	{
+		std::cout << "Sock Err: " << WSAGetLastError();
+		WSACleanup();
+		return 0;
+	}
+
+	sockaddr_in sockAddr{};
+	sockAddr.sin_family = AF_INET;
+	sockAddr.sin_port = htons(12031);
+	sockAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+
+	// bind socket
+	int bound = bind(sock, (sockaddr*)&sockAddr, sizeof(sockAddr));
+	if (bound == SOCKET_ERROR)
+	{
+		std::cout << "Bind Err: " << WSAGetLastError();
+		WSACleanup();
+		return 0;
+	}
+
+	//// listen()
+	//if (!listen(sock))
+	//{
+	//	printf("Error in listen(). Code: %d\n", WSAGetLastError());
+	//	WSACleanup();
+	//	return 0;
+	//}
+	printf("Listening. . . \n");
+	int status = listen(sock, 5);
+	if (status == SOCKET_ERROR)
+	{
+		printf("Error in listen(). Code: %d\n", WSAGetLastError());
+		WSACleanup();
+		return 0;
+	}
+
+	printf("accepting. . .\n");
+	while (g_bServerRunning)
+	{
+		sockaddr_in cliAddr;
+		int addrLen = sizeof(cliAddr);
+		SOCKET cliSock = accept(sock, (sockaddr*)&cliAddr, &addrLen);
+		if (cliSock == INVALID_SOCKET)
+		{
+			// report error if server is supposed to be running
+			if (g_bServerRunning)  
+			{
+				printf("Accept error: %d\n", WSAGetLastError());
+			}
+			continue;
+		}
+
+		std::thread clientThread(ManageClient, cliSock);
+		clientThread.detach();
+	}
+	
+	// wait for all clients to disconnect
+	std::unique_lock<std::mutex> lock(g_ClientMutex);
+	// lambda !!! for if all clients disconnect
+	g_ConditionVar.wait(lock, [] { return g_iActiveClients == 0; });
+
 	// close server if all all hosts disconnected
 	closesocket(sock);
+	WSACleanup();
+	return 0;
 }

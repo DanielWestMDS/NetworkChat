@@ -8,7 +8,9 @@ CClient::CClient()
 	m_clientAddr.sin_port = NULL;
 	m_clientAddr.sin_addr.S_un.S_addr = NULL;	// bind status
 	m_iStatus = 0;
-	buffer[255] = {};
+	m_cBuffer[BUFFER_SIZE - 1] = {};
+	m_wIP[BUFFER_SIZE - 1] = {};
+	m_cIP[BUFFER_SIZE - 1] = {};
 }
 
 CClient::~CClient()
@@ -26,23 +28,33 @@ int CClient::Setup()
 		return 0;
 	}
 
-	//set address
-	m_clientAddr.sin_family = AF_INET;
-	m_clientAddr.sin_port = htons(54672);
-	m_clientAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-
-	//bind 
-	m_iStatus = bind(m_clientSock, (sockaddr*)&m_clientAddr, sizeof(m_clientAddr));
-	if (m_iStatus == SOCKET_ERROR)
+	// iterate through sockets until one works
+	int iSockOffset = 0;
+	do
 	{
-		printf("Error in bind(), Error: %d\n", WSAGetLastError());
-		return 0;
-	}
+		//set address
+		m_clientAddr.sin_family = AF_INET;
+		m_clientAddr.sin_port = htons(54672 + iSockOffset);
+		m_clientAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+
+		//bind 
+		m_iStatus = bind(m_clientSock, (sockaddr*)&m_clientAddr, sizeof(m_clientAddr));
+		if (m_iStatus == SOCKET_ERROR)
+		{
+			printf("Error in bind(), Error: %d\n", WSAGetLastError());
+			iSockOffset++;
+		}
+	} while (m_iStatus == SOCKET_ERROR);
 
 	sockaddr_in recAddr;
 	recAddr.sin_family = AF_INET;
 	recAddr.sin_port = htons(12031);
-	InetPton(AF_INET, L"192.168.1.17", &recAddr.sin_addr.S_un.S_addr);
+	printf("\nPlease Enter the Server IP address: ");
+	std::cin.getline(m_cIP, BUFFER_SIZE);
+	// convert IP to something InetPton can read (wchar_t)
+	size_t iConvertedCharacters = 0;
+	mbstowcs_s(&iConvertedCharacters, m_wIP, m_cIP, BUFFER_SIZE - 1);
+	InetPton(AF_INET, m_wIP, &recAddr.sin_addr.S_un.S_addr);
 
 	m_iStatus = connect(m_clientSock, (sockaddr*)&recAddr, sizeof(recAddr));
 	if (m_iStatus == SOCKET_ERROR)
@@ -60,10 +72,10 @@ void CClient::SendLoop()
 	{
 		printf("Enter a message to send: \n");
 		// can I just use normal cin >> here?
-		std::cin.getline(buffer, BUFFER_SIZE);
+		std::cin.getline(m_cBuffer, BUFFER_SIZE);
 
 		// close socket if QUIT command called
-		if (strstr(buffer, "/QUIT"))
+		if (strstr(m_cBuffer, "/QUIT"))
 		{
 			shutdown(m_clientSock, SD_SEND);
 			closesocket(m_clientSock);
@@ -71,7 +83,7 @@ void CClient::SendLoop()
 		}
 
 		// error checking
-		m_iStatus = send(m_clientSock, buffer, strlen(buffer), 0);
+		m_iStatus = send(m_clientSock, m_cBuffer, strlen(m_cBuffer), 0);
 		if (m_iStatus == SOCKET_ERROR)
 		{
 			printf("Error in send(). Error: %d\n", WSAGetLastError());

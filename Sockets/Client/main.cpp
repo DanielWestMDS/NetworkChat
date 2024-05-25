@@ -37,5 +37,7 @@ int main()
 	{
 		Client->SendLoop();
 	}
+
+	WSACleanup();
 	return 0;
 }

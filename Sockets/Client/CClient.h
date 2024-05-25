@@ -23,6 +23,10 @@ private:
 	// bind status
 	int m_iStatus;
 	// wherer message is held
-	char buffer[BUFFER_SIZE];
+	char m_cBuffer[BUFFER_SIZE];
+	// for getting IP address
+	wchar_t m_wIP[BUFFER_SIZE];
+	char m_cIP[BUFFER_SIZE];
+
 };
 
